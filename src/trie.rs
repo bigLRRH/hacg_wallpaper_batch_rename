@@ -19,7 +19,6 @@ impl Trie {
         }
     }
 
-    // todo 修bug
     pub fn generalized_longest_common_prefix(&self, min_weight: usize) -> String {
         let mut common_prefix = String::new();
         let mut node = &self.root;
