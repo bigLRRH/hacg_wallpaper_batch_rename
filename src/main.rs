@@ -1,9 +1,12 @@
+mod trie;
+
 use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
 };
 
+use ansi_term::Colour::{Blue, Green};
 use regex::Regex;
 
 const SOURCE_PATH: &str = r"D:\Resources\pictures\wallpaper_cache";
@@ -57,7 +60,10 @@ fn match_dirs(source: &Path, re: &Regex) -> Result<Vec<DirInfo>, Box<dyn Error>>
 
 fn process_matched_dirs(matched_dirs: Vec<DirInfo>, target: &Path) -> Result<(), Box<dyn Error>> {
     for dir_path in matched_dirs {
-        // 遍历目录中的文件
+        // 1.提取文件前缀
+        let mut trie = trie::Trie::new();
+
+        // 遍历目录中的文件, 生成前缀树
         for entry in fs::read_dir(&dir_path.path_buf)? {
             let entry = entry?;
             let path = entry.path();
@@ -66,7 +72,67 @@ fn process_matched_dirs(matched_dirs: Vec<DirInfo>, target: &Path) -> Result<(),
                 continue;
             }
 
-            // todo 提取文件前缀和编号，生成新文件名
+            let file_stem = path.file_stem().unwrap().to_string_lossy().to_string();
+            trie.insert(file_stem);
+
+            println!("{:?}", path);
+        }
+
+        let mut common_prefix = trie.generalized_longest_common_prefix(2);
+        // 移除common_prefix后面的数字部分
+        let re = Regex::new(r"\d+$").unwrap();
+        common_prefix = re.replace_all(&common_prefix, "").to_string();
+        println!("common_prefix: {}", common_prefix);
+
+        // 2.生成新文件名
+        for entry in fs::read_dir(&dir_path.path_buf)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if !path.is_file() {
+                continue;
+            }
+
+            // 如果文件有common_prefix, 则重命名
+            let file_stem = path.file_stem().unwrap().to_string_lossy();
+            println!("file_stem: {}", file_stem);
+            if file_stem.starts_with(&common_prefix) {
+                // 提取数字部分,并补齐到3位
+                let re = Regex::new(r"\d+$").unwrap();
+                match re.find(&file_stem) {
+                    None => {
+                        println!(
+                            "{}{}",
+                            Blue.paint("No number found in file_stem: "),
+                            file_stem
+                        );
+                        continue;
+                    }
+                    Some(num) => {
+                        let num = num.as_str().parse::<u16>().unwrap();
+                        let num_str = format!("{:03}", num);
+                        println!("num_str: {}", num_str);
+                        // 生成新文件名
+                        let new_file_name = format!(
+                            "{}{}.{}",
+                            dir_path.year_month,
+                            num_str,
+                            path.extension().unwrap().to_string_lossy()
+                        );
+                        println!("new_file_name: {}", new_file_name);
+                        let new_file_path = target.join(new_file_name);
+                        println!("new_file_path: {:?}", new_file_path);
+                        // 移动文件
+                        println!(
+                            "{}{:?} -> {:?}",
+                            Green.paint("Moving file: "),
+                            path,
+                            new_file_path
+                        );
+                        fs::rename(&path, new_file_path)?;
+                    }
+                }
+            }
         }
     }
     Ok(())
