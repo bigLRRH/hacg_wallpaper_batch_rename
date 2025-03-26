@@ -53,7 +53,8 @@ impl TrieNode {
             .max_by(|a, b| {
                 a.1.weight.cmp(&b.1.weight).then_with(|| {
                     match (
-                        // * 可能会重复比较同一个节点，实际上几乎不会出现这种情况，暂时不优化
+                        // * 可能会重复比较同一个节点
+                        // * 我想到一个绝妙的算法，但是我懒得写了
                         a.1.get_max_weight_child(min_weight),
                         b.1.get_max_weight_child(min_weight),
                     ) {
